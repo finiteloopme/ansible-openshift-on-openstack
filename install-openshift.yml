@@ -7,12 +7,14 @@
     - name: Retrieve facts for all servers
       os_server_facts:
         server: "{{ inventory_hostname }}"
-      register: result
+      register: original_inventory
+
     # Debug task to list the results returned
     - name: "Print server information"
       debug:
-        var: result.ansible_facts.openstack_servers
-      when: result.ansible_facts.openstack_servers | int > 0
+        var: original_inventory.ansible_facts.openstack_servers
+      when: original_inventory.ansible_facts.openstack_servers[0].name is defined
+
     - name: "Launch required server(s) on OpenStack"
       os_server:
         state: present
@@ -25,11 +27,18 @@
         auto_ip: no
         meta:
           hostname: "{{ inventory_hostname }}"
-      when: result.ansible_facts.openstack_servers | int == 0
+      when: original_inventory.ansible_facts.openstack_servers[0].name is undefined
+
     - name: "Assign a floating (public) IP"
       os_floating_ip:
         server: "{{ inventory_hostname }}"
       register: ip_result
+      until: ((ip_result.floating_ip is defined) and (ip_result.floating_ip.status is defined) and (ip_result.floating_ip.status == "ACTIVE"))
+      retries: 6
+      delay: 15
+      when: original_inventory.ansible_facts.openstack_servers[0].name is undefined
+
     - name: "Print IP addresses"
       debug:
         var: ip_result
+      # when: original_inventory.ansible_facts.openstack_servers[0].name is undefined
