@@ -31,7 +31,7 @@ openshift_master_identity_providers=[{'name': 'htpasswd_auth', 'login': 'true', 
 master openshift_public_hostname="{{ inventory_hostname }}" openshift_hostname="{{ ansible_default_ipv4.address }}"
 
 [etcd]
-etcd
+#etcd
 
 [lb]
 #ose3-lb-ansible.test.example.com

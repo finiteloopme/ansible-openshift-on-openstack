@@ -13,14 +13,23 @@
       debug:
         var: result.ansible_facts.openstack_servers
       when: result.ansible_facts.openstack_servers | int > 0
-    - name: "Launching required server(s) on OpenStack"
+    - name: "Launch required server(s) on OpenStack"
       os_server:
         state: present
         name: "{{ inventory_hostname }}"
         image: fa605955-b2ff-4e6e-b7f2-55702344226d
         security_groups: klimaye-secgrp
+        key_name: klimaye-macb-air
         flavor: m1.large
         api_timeout: 600
+        auto_ip: no
         meta:
           hostname: "{{ inventory_hostname }}"
       when: result.ansible_facts.openstack_servers | int == 0
+    - name: "Assign a floating (public) IP"
+      os_floating_ip:
+        server: "{{ inventory_hostname }}"
+      register: ip_result
+    - name: "Print IP addresses"
+      debug:
+        var: ip_result
