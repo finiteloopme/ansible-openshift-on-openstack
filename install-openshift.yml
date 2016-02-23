@@ -1,0 +1,26 @@
+- name: Retrieve facts about server instances from OpenStack
+  hosts: OSEv3:children
+  connection: local
+
+  tasks:
+    # Task to gather facts from OpenStack
+    - name: Retrieve facts for all servers
+      os_server_facts:
+        server: "{{ inventory_hostname }}"
+      register: result
+    # Debug task to list the results returned
+    - name: "Print server information"
+      debug:
+        var: result.ansible_facts.openstack_servers
+      when: result.ansible_facts.openstack_servers | int > 0
+    - name: "Launching required server(s) on OpenStack"
+      os_server:
+        state: present
+        name: "{{ inventory_hostname }}"
+        image: fa605955-b2ff-4e6e-b7f2-55702344226d
+        security_groups: klimaye-secgrp
+        flavor: m1.large
+        api_timeout: 600
+        meta:
+          hostname: "{{ inventory_hostname }}"
+      when: result.ansible_facts.openstack_servers | int == 0
