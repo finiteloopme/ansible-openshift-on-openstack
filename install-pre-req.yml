@@ -1,0 +1,105 @@
+- name: Retrieve facts about server instances from OpenStack
+  hosts: OSEv3:children
+  become: true
+  vars:
+    install_user_ssh_key: ""
+  #remote_user: cloud-user
+
+  tasks:
+    - name: "Create an {{ openshift_install_user }} user"
+      user:
+        name: "{{ openshift_install_user }}"
+        state: present
+        comment: "OpenShift user"
+        generate_ssh_key: yes
+        group: "wheel"
+
+    - name: "Add the user to sudoer's list"
+      lineinfile:
+        dest: "/etc/sudoers"
+        state: present
+        line: "wheel ALL=(ALL) NOPASSWD:ALL"
+
+      # TODO: Find a better way to identify master
+    - name: "Get the {{ openshift_install_user }} user key from master"
+      become_user: "{{ openshift_install_user }}"
+      become_method: sudo
+      command: "cat ~/.ssh/id_rsa.pub"
+      register: key_result
+      when: inventory_hostname == "master"
+
+    - name: "Write a temporary file"
+      local_action: copy content="{{ key_result.stdout }}" dest="/tmp/key" force=yes # mode=0600
+      when: inventory_hostname == "master"
+
+    - name: "Set a temporary fact"
+      local_action: set_fact install_user_ssh_key="{{ lookup('file', '/tmp/key') }}"
+
+    # - name: "Print key"
+    #   debug:
+    #     var: install_user_ssh_key
+
+    - name: "Copy the ssh key to all the hosts"
+      authorized_key:
+        user: "{{ openshift_install_user }}"
+        key: "{{ install_user_ssh_key }}"
+        exclusive: yes
+
+    # - name: "Create authorized_keys files"
+    #   become_user: "{{ openshift_install_user }}"
+    #   become_method: sudo
+    #   command: "echo {{ install_user_ssh_key }} > ~/.ssh/authorized_keys"
+
+    # - name: "Set appropriate permissions on security sensistive files"
+    #   become_user: "{{ openshift_install_user }}"
+    #   become_method: sudo
+    #   file:
+    #     # path: "~/.ssh/authorized_keys"
+    #     path: "~/.ssh/id_rsa.pub"
+    #     mode: 0600
+
+    # - name: "Copy the ssh key to all the hosts"
+    #   authorized_key:
+    #     user: "{{ openshift_install_user }}"
+    #     # key: "{{ install_user_ssh_key }}" # "{{ lookup('file', '/tmp/key') }}"
+    #     key: "{{ item }}"
+    #     exclusive: yes
+    #     state: present
+    #   with_file:
+    #     - /tmp/key
+
+    - name: "Disabling undesired service(s)"
+      service:
+        name: "{{ item }}"
+        state: "stopped"
+        enabled: "no"
+      with_items:
+          - cloud-init
+          - cloud-init-local
+          - cloud-final
+          - cloud-config
+          - NetworkManager
+
+    - name: "Backup resolv.conf"
+      command: mv /etc/resolv.conf /etc/resolv.conf.bk
+
+    - name: "Set the nameserver to 8.8.8.8 & 8.8.4.4"
+      lineinfile:
+        create: yes
+        dest: "/etc/resolv.conf"
+        state: present
+        line: "{{ item }}"
+      with_items:
+        - "nameserver 8.8.8.8"
+        - "nameserver 8.8.4.4"
+
+    - name: "Restart network service"
+      service:
+        name: "network"
+        state: "restarted"
+        enabled: "yes"
+
+    # - name: "Update RHEL to latest release"
+    #   yum:
+    #     name: "*"
+    #     state: "latest"
