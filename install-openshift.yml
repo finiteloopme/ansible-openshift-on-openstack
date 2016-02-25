@@ -9,11 +9,11 @@
         server: "{{ inventory_hostname }}"
       register: original_inventory
 
-    # Debug task to list the results returned
-    - name: "Print server information"
-      debug:
-        var: original_inventory.ansible_facts.openstack_servers
-      when: original_inventory.ansible_facts.openstack_servers[0].name is defined
+    # # Debug task to list the results returned
+    # - name: "Print server information"
+    #   debug:
+    #     var: original_inventory.ansible_facts.openstack_servers
+    #   when: original_inventory.ansible_facts.openstack_servers[0].name is defined
 
     - name: "Launch required server(s) on OpenStack"
       os_server:
@@ -36,9 +36,29 @@
       until: ((ip_result.floating_ip is defined) and (ip_result.floating_ip.status is defined) and (ip_result.floating_ip.status == "ACTIVE"))
       retries: 6
       delay: 15
-      when: original_inventory.ansible_facts.openstack_servers[0].name is undefined
+      #when: original_inventory.ansible_facts.openstack_servers[0].name is undefined
 
-    - name: "Print IP addresses"
-      debug:
-        var: ip_result
+    # - name: "Print IP addresses"
+    #   debug:
+    #     var: ip_result
       # when: original_inventory.ansible_facts.openstack_servers[0].name is undefined
+
+    - name: "Get the current server(s) information"
+      os_server_facts:
+        server: "{{ inventory_hostname }}"
+      register: current_inventory
+
+      # TODO: Find a better way to get IP address for each Host
+    - name: "Adding server(s) to /etc/hosts file"
+      become: yes
+      lineinfile: dest=/etc/hosts line='{{ item.networks.novanetwork_22[1] }}   {{ inventory_hostname }}'
+    #   debug:
+    #     var: "{{ item.networks.novanetwork_22[1] }}"
+    # .ansible_facts.openstack_servers[{{ inventory_hostname }}]
+      register: write_hosts_file_result
+      until: write_hosts_file_result|success
+      retries: 10
+      delay: 1
+      with_items: current_inventory.ansible_facts.openstack_servers
+
+- include: install-pre-req.yml
