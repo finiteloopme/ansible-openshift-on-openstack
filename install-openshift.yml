@@ -23,10 +23,14 @@
         security_groups: klimaye-secgrp
         key_name: klimaye-macb-air
         flavor: m1.large
-        api_timeout: 600
+        api_timeout: 60
         auto_ip: no
         meta:
           hostname: "{{ inventory_hostname }}"
+      register: launch_result
+      until: launch_result|success
+      retries: 5
+      delay: 30
       when: original_inventory.ansible_facts.openstack_servers[0].name is undefined
 
     - name: "Assign a floating (public) IP"
@@ -35,7 +39,7 @@
       register: ip_result
       until: ((ip_result.floating_ip is defined) and (ip_result.floating_ip.status is defined) and (ip_result.floating_ip.status == "ACTIVE"))
       retries: 6
-      delay: 15
+      delay: 20
       #when: original_inventory.ansible_facts.openstack_servers[0].name is undefined
 
     # - name: "Print IP addresses"

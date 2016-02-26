@@ -3,9 +3,40 @@
   become: true
   vars:
     install_user_ssh_key: ""
+    remote_etc_hosts: ""
   #remote_user: cloud-user
 
   tasks:
+    - name: "Set hostnames"
+      hostname:
+        name: "{{ inventory_hostname }}"
+
+    - name: "Write remote /etc/hosts temporary file(s)"
+      lineinfile:
+        dest: "/tmp/hosts"
+        create: "yes"
+        line: "{{ item.networks.novanetwork_22[0] }}   {{ inventory_hostname }}"
+      with_items: current_inventory.ansible_facts.openstack_servers
+      delegate_to: localhost
+
+    - name: "Update remote /etc/hosts fact"
+      local_action: set_fact remote_etc_hosts="{{ lookup('file', '/tmp/hosts') }}"
+
+    - name: "Clean up [1] /etc/hosts file(s)"
+      file:
+        path: "/etc/hosts"
+        state: "absent"
+
+    - name: "Clean up [2] /etc/hosts file(s)"
+      file:
+        path: "/etc/hosts"
+        state: "touch"
+
+    - name: "Update /etc/hosts file(s)"
+      lineinfile:
+        dest: "/etc/hosts"
+        line: "{{ remote_etc_hosts }}"
+
     - name: "Create an {{ openshift_install_user }} user"
       user:
         name: "{{ openshift_install_user }}"

@@ -3,11 +3,24 @@
   hosts: localhost
   connection: local
 
+  vars:
+    - ansible_become: yes
+    - ansible_become_method: sudo
+
   vars_prompt:
+
     - name: "num_of_masters"
-      prompt: "How many master nodes do you want to configure? "
+      prompt: "How many master nodes do you want to configure?"
       default: "1"
+      private: no
 
     - name: "num_of_nodes"
-      prompt: "How many nodes do you want to configure? "
+      prompt: "How many nodes do you want to configure?"
       default: "2"
+      private: no
+
+    - name: "ansible_become_pass"
+      prompt: "Password to use 'sudo' command on localhost"
+      private: yes
+
+- include: install-openshift.yml
